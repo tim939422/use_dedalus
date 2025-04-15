@@ -10,8 +10,8 @@ import logging
 logger = logging.getLogger(__name__)
 
 # Parameters
-Lx = 5
-Nx, Nz = 2, 256
+Lx, Ly = 5, 2
+Nx, Ny, Nz = 2, 2, 256
 Reb = 100.0
 dealias = 3/2
 stop_sim_time = 100
@@ -19,24 +19,25 @@ timestepper = d3.RK222
 max_timestep=0.1
 
 # Basis
-coords =d3.CartesianCoordinates('x','z')
-dist=d3.Distributor(coords,dtype=np.float64)
-xbasis=d3.RealFourier(coords['x'], size=Nx, bounds=(0,Lx), dealias=dealias)
+coords =d3.CartesianCoordinates('x','y', 'z')
+dist = d3.Distributor(coords,dtype=np.float64)
+xbasis = d3.RealFourier(coords['x'], size=Nx, bounds=(0, Lx), dealias=dealias)
+ybasis = d3.RealFourier(coords['y'], size=Ny, bounds=(0, Ly), dealias=dealias)
 zbasis=d3.Chebyshev(coords['z'], size=Nz, bounds=(-1, 1), dealias=dealias)
 
 
 # Fields
-p = dist.Field(name='p', bases=(xbasis, zbasis))
-u = dist.VectorField(coords, name='u', bases=(xbasis, zbasis))
+p = dist.Field(name='p', bases=(xbasis, ybasis, zbasis))
+u = dist.VectorField(coords, name='u', bases=(xbasis, ybasis, zbasis))
 tau_p = dist.Field(name='tau_p') # for pressure gauge
-tau_u1= dist.VectorField(coords, name='tau_u1', bases=xbasis) # no slip BC in continuity equatio div u = 0
-tau_u2= dist.VectorField(coords, name='tau_u2', bases=xbasis) # no-slip BC in momentum equation
+tau_u1= dist.VectorField(coords, name='tau_u1', bases=(xbasis, ybasis)) # no slip BC in continuity equatio div u = 0
+tau_u2= dist.VectorField(coords, name='tau_u2', bases=(xbasis, ybasis)) # no-slip BC in momentum equation
 f_dp= dist.Field(name='f_dp') # time-dependent bodyforce to enforce constant flowrate
 
 # substitute
 nu = 1/Reb
-x, z = dist.local_grids(xbasis, zbasis)
-ex, ez = coords.unit_vector_fields(dist)
+x, y, z = dist.local_grids(xbasis, ybasis, zbasis)
+ex, ey, ez = coords.unit_vector_fields(dist)
 lift_basis = zbasis.derivative_basis(1)
 lift= lambda A: d3.Lift(A,lift_basis, -1)
 grad_u = d3.grad(u) + ez*lift(tau_u1) # First-order reduction
@@ -55,7 +56,7 @@ problem.add_equation("u(z = -1 ) = 0")
 problem.add_equation("u(z = 1) = 0")
 
 # fixed flow rate
-problem.add_equation("integ(u@ex) = 2*Lx")
+problem.add_equation("integ(u@ex) = 2*Lx*Ly")
 
 
 # solver

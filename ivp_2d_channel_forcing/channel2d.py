@@ -12,9 +12,9 @@ logger = logging.getLogger(__name__)
 # Parameters
 Lx = 5
 Nx, Nz = 2, 256
-Reb = 100.0
+Re = 100.0 # Retau = sqrt(2Re)
 dealias = 3/2
-stop_sim_time = 100
+stop_sim_time = 1000
 timestepper = d3.RK222
 max_timestep=0.1
 
@@ -31,10 +31,10 @@ u = dist.VectorField(coords, name='u', bases=(xbasis, zbasis))
 tau_p = dist.Field(name='tau_p') # for pressure gauge
 tau_u1= dist.VectorField(coords, name='tau_u1', bases=xbasis) # no slip BC in continuity equatio div u = 0
 tau_u2= dist.VectorField(coords, name='tau_u2', bases=xbasis) # no-slip BC in momentum equation
-f_dp= dist.Field(name='f_dp') # time-dependent bodyforce to enforce constant flowrate
 
 # substitute
-nu = 1/Reb
+nu = 1/Re
+f_dp = 2/Re
 x, z = dist.local_grids(xbasis, zbasis)
 ex, ez = coords.unit_vector_fields(dist)
 lift_basis = zbasis.derivative_basis(1)
@@ -42,10 +42,10 @@ lift= lambda A: d3.Lift(A,lift_basis, -1)
 grad_u = d3.grad(u) + ez*lift(tau_u1) # First-order reduction
 
 # problem
-problem=d3.IVP([u, p, tau_p, tau_u1, tau_u2,f_dp], namespace=locals())
+problem=d3.IVP([u, p, tau_p, tau_u1, tau_u2], namespace=locals())
 # governing equation: continuity + momentum
 problem.add_equation("trace(grad_u) + tau_p = 0")
-problem.add_equation("dt(u) + grad(p) - nu*div(grad_u)  + lift(tau_u2) + f_dp*ex = -u@grad(u)")
+problem.add_equation("dt(u) + grad(p) - nu*div(grad_u)  + lift(tau_u2) = -u@grad(u) + f_dp*ex")
 
 # pressure gauge
 problem.add_equation("integ(p) = 0")
@@ -53,9 +53,6 @@ problem.add_equation("integ(p) = 0")
 # boundary condition
 problem.add_equation("u(z = -1 ) = 0")
 problem.add_equation("u(z = 1) = 0")
-
-# fixed flow rate
-problem.add_equation("integ(u@ex) = 2*Lx")
 
 
 # solver
